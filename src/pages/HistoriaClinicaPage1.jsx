@@ -45,7 +45,7 @@ export default function HistoriaClinicaPage() {
         .from('historia_clinica')
         .select('*')
         .eq('paciente_id', parseInt(pacienteId))
-        .maybeSingle()
+        .single()
       setContenido(hc?.contenido || '')
 
       // Archivos adjuntos
@@ -79,7 +79,7 @@ export default function HistoriaClinicaPage() {
         .from('historia_clinica')
         .select('contenido')
         .eq('paciente_id', parseInt(pacienteId))
-        .maybeSingle()
+        .single()
       setContenido(hc?.contenido || '')
     } catch (err) {
       toast.error('Error guardando nota: ' + err.message)
@@ -144,7 +144,7 @@ export default function HistoriaClinicaPage() {
         .from('historia_clinica')
         .select('id')
         .eq('paciente_id', parseInt(pacienteId))
-        .maybeSingle()
+        .single()
 
       // Registrar en historia_clinica_archivos
       const { error: insertError } = await supabase
