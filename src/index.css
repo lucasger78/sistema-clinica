@@ -356,3 +356,118 @@ input:focus, select:focus, textarea:focus {
   background-color: #D5F5E3;
   border-color: #1E8449;
 }
+
+/* ── Dark Mode Custom Overrides ── */
+.dark body {
+  background-color: #0b111e !important;
+  color: #f1f5f9 !important;
+}
+
+.dark .glass-card {
+  background: rgba(17, 26, 46, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
+}
+
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+  color: #f1f5f9 !important;
+}
+
+/* Override text color utilities */
+.dark .text-gray-800 { color: #f8fafc !important; }
+.dark .text-gray-700 { color: #e2e8f0 !important; }
+.dark .text-gray-600 { color: #cbd5e1 !important; }
+.dark .text-gray-500 { color: #94a3b8 !important; }
+.dark .text-gray-400 { color: #64748b !important; }
+
+/* Override background utilities */
+.dark .bg-white { background-color: #111a2e !important; }
+.dark .bg-gray-50 { background-color: #0f172a !important; }
+.dark .bg-gray-100 { background-color: #1e293b !important; }
+
+/* Override border utilities */
+.dark .border-gray-100 { border-color: #1e293b !important; }
+.dark .border-gray-200 { border-color: #334155 !important; }
+
+/* Forms */
+.dark .form-input {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+.dark .form-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+}
+.dark select.form-input option {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+}
+
+/* Secondary Button */
+.dark .btn-secondary {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+.dark .btn-secondary:hover {
+  background-color: #334155 !important;
+  border-color: #475569 !important;
+}
+
+/* Modals */
+.dark .modal-content {
+  background-color: #111a2e !important;
+  border: 1px solid #1e293b !important;
+  color: #f1f5f9 !important;
+}
+.dark .modal-overlay {
+  background: rgba(0, 0, 0, 0.75) !important;
+}
+
+/* Skeletons */
+.dark .skeleton {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%) !important;
+  background-size: 200px 100% !important;
+}
+
+/* Alerts & Status boxes */
+.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.15) !important; color: #60a5fa !important; }
+.dark .text-blue-800 { color: #60a5fa !important; }
+.dark .text-blue-950 { color: #f1f5f9 !important; }
+.dark .bg-green-50 { background-color: rgba(16, 185, 129, 0.15) !important; color: #34d399 !important; }
+.dark .text-green-800 { color: #34d399 !important; }
+
+.dark .bg-orange-50 { background-color: rgba(245, 158, 11, 0.15) !important; color: #fbbf24 !important; }
+.dark .text-orange-800 { color: #fbbf24 !important; }
+.dark .border-orange-300 { border-color: rgba(245, 158, 11, 0.3) !important; }
+
+.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.15) !important; color: #f87171 !important; }
+.dark .text-red-400 { color: #f87171 !important; }
+
+/* Agenda Slots and cells */
+.dark .agenda-slot {
+  border-color: #334155 !important;
+  color: #cbd5e1 !important;
+}
+.dark .agenda-slot:hover {
+  background-color: #1e293b !important;
+}
+.dark .agenda-slot.empty:hover {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+}
+
+.dark .divide-gray-50 > * {
+  border-color: #1e293b !important;
+}
+
+.dark header {
+  background-color: #111a2e !important;
+  border-color: #1e293b !important;
+}
+
+.dark .sticky {
+  background-color: #111a2e !important;
+  color: #cbd5e1 !important;
+}
+

@@ -52,3 +52,26 @@ CREATE POLICY "Acceso autenticado lista_espera" ON lista_espera FOR ALL TO authe
 
 ALTER TABLE pagos ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Acceso autenticado pagos" ON pagos FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- RLS para turnos (tabla central de la agenda)
+ALTER TABLE turnos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Autenticados ven turnos"
+ON turnos FOR SELECT
+TO authenticated
+USING (true);
+
+CREATE POLICY "Autenticados insertan turnos"
+ON turnos FOR INSERT
+TO authenticated
+WITH CHECK (true);
+
+CREATE POLICY "Autenticados actualizan turnos"
+ON turnos FOR UPDATE
+TO authenticated
+USING (true)
+WITH CHECK (true);
+
+-- RLS para pacientes
+ALTER TABLE pacientes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Acceso autenticado pacientes" ON pacientes FOR ALL TO authenticated USING (true) WITH CHECK (true);

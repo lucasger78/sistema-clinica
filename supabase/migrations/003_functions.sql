@@ -16,7 +16,11 @@ CREATE OR REPLACE FUNCTION crear_turno_seguro(
   p_canal_origen       varchar,
   p_forzar_sobreturno  bool DEFAULT false,
   p_motivo_sobreturno  text DEFAULT NULL
-) RETURNS json AS $$
+) RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
   v_turno_existente int4;
   v_nuevo_id int4;
@@ -64,7 +68,7 @@ BEGIN
 
   RETURN json_build_object('ok', true, 'id', v_nuevo_id);
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 
 -- 2. Calcular slots disponibles de un profesional

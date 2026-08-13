@@ -1,9 +1,10 @@
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import {
   LayoutDashboard, Users, UserCog, Calendar, CalendarPlus,
   FileText, Clock, CreditCard, BarChart3, Settings,
-  LogOut, Heart, ChevronLeft, ChevronRight, X
+  LogOut, Heart, ChevronLeft, ChevronRight, X, Sun, Moon
 } from 'lucide-react'
 
 const menuItems = [
@@ -21,6 +22,22 @@ const menuItems = [
 export default function Sidebar({ isOpen, onToggle, mobileOpen, onMobileClose }) {
   const { user, rol, logout } = useAuth()
   const navigate = useNavigate()
+
+  const [isDark, setIsDark] = useState(() => {
+    return document.documentElement.classList.contains('dark')
+  })
+
+  const toggleTheme = () => {
+    const next = !isDark
+    setIsDark(next)
+    if (next) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }
 
   const filteredItems = menuItems.filter(item => item.roles.includes(rol))
 
@@ -83,6 +100,14 @@ export default function Sidebar({ isOpen, onToggle, mobileOpen, onMobileClose })
             <p className="text-blue-200/60 text-xs capitalize">{rol}</p>
           </div>
         )}
+        <button
+          onClick={toggleTheme}
+          className={`flex items-center gap-3 w-full px-3 py-2.5 mb-1.5 rounded-lg text-blue-100/70 hover:text-white hover:bg-white/8 transition-all ${!isOpen ? 'justify-center' : ''}`}
+          title={isDark ? "Modo Claro" : "Modo Oscuro"}
+        >
+          {isDark ? <Sun className="w-5 h-5 flex-shrink-0 text-yellow-400" /> : <Moon className="w-5 h-5 flex-shrink-0" />}
+          {isOpen && <span className="text-sm">{isDark ? "Modo Claro" : "Modo Oscuro"}</span>}
+        </button>
         <button
           onClick={handleLogout}
           className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-blue-100/70 hover:text-white hover:bg-white/8 transition-all ${!isOpen ? 'justify-center' : ''}`}
