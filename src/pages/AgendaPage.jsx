@@ -145,6 +145,12 @@ export default function AgendaPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-800">Agenda</h1>
         <div className="flex items-center gap-3">
+          <button 
+            onClick={() => navigate('/turnos/nuevo')} 
+            className="btn-primary text-sm py-1.5 px-3 flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" /> Nuevo Turno
+          </button>
           <div className="flex bg-gray-100 rounded-lg p-0.5">
             <button onClick={() => setVista('diaria')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${vista === 'diaria' ? 'bg-white shadow-sm text-[#1B4F72]' : 'text-gray-500'}`}>
               <List className="w-4 h-4 inline mr-1" /> Diaria

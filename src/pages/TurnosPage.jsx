@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import {
   Search, User, Calendar, Clock, Check, ChevronRight,
-  ChevronLeft, AlertTriangle, X, Loader2, Plus, Save
+  ChevronLeft, AlertTriangle, X, Loader2, Plus, Save,
+  Edit3, ToggleLeft, ToggleRight
 } from 'lucide-react'
 
 const STEPS = ['Paciente', 'Profesional y Fecha', 'Horario', 'Confirmar']
@@ -45,6 +46,12 @@ export default function TurnosPage() {
   const [forzarSobreturno, setForzarSobreturno] = useState(false)
   const [motivoSobreturno, setMotivoSobreturno] = useState('')
 
+  // Modo manual
+  const [modoManual, setModoManual] = useState(false)
+  const [horaManual, setHoraManual] = useState(initialHora || '')
+  const [validandoHora, setValidandoHora] = useState(false)
+  const [estadoHoraManual, setEstadoHoraManual] = useState(null) // null | 'libre' | 'ocupado'
+
   useEffect(() => {
     supabase.from('profesionales').select('*').eq('activo', true).order('apellido')
       .then(({ data }) => {
@@ -76,7 +83,42 @@ export default function TurnosPage() {
     return () => clearTimeout(timer)
   }, [searchPaciente])
 
-  // Obtener slots cuando se elige profesional y fecha
+  // Validar hora manual contra turnos existentes
+  const validarHoraManual = useCallback(async (hora) => {
+    if (!hora || !profSeleccionado || !fechaTurno) return
+    setValidandoHora(true)
+    setEstadoHoraManual(null)
+    setForzarSobreturno(false)
+    setMotivoSobreturno('')
+    try {
+      const { data, error } = await supabase
+        .from('turnos')
+        .select('id, nombre')
+        .eq('profesional_id', profSeleccionado.id)
+        .eq('fecha_turno', fechaTurno)
+        .eq('hora', hora + ':00')
+        .eq('cancelado', false)
+        .limit(1)
+      if (error) throw error
+      const ocupado = data && data.length > 0
+      setEstadoHoraManual(ocupado ? 'ocupado' : 'libre')
+      // Sintetizar un slot "manual" para compatibilidad con confirmarTurno
+      setSlotSeleccionado({ hora_slot: hora + ':00', disponible: !ocupado, manual: true })
+    } catch {
+      toast.error('No se pudo verificar el horario')
+    }
+    setValidandoHora(false)
+  }, [profSeleccionado, fechaTurno])
+
+  useEffect(() => {
+    if (!modoManual) return
+    const timer = setTimeout(() => {
+      if (horaManual) validarHoraManual(horaManual)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [horaManual, modoManual, validarHoraManual])
+
+  // Obtener slots automáticos cuando se elige profesional y fecha
   async function fetchSlots() {
     if (!profSeleccionado) return
     setLoadingSlots(true)
@@ -88,19 +130,31 @@ export default function TurnosPage() {
       if (error) throw error
       const fetchedSlots = data || []
       setSlots(fetchedSlots)
-      if (initialHora) {
+
+      // Si no hay slots, activar modo manual automáticamente
+      if (fetchedSlots.length === 0) {
+        setModoManual(true)
+        if (initialHora) {
+          setHoraManual(initialHora)
+        }
+      } else if (initialHora) {
         const found = fetchedSlots.find(s => s.hora_slot?.startsWith(initialHora))
         if (found) {
           setSlotSeleccionado(found)
           if (!found.disponible) {
             setForzarSobreturno(true)
           }
+        } else {
+          // La hora viene de la agenda pero no coincide con slots → modo manual
+          setModoManual(true)
+          setHoraManual(initialHora)
         }
       }
     } catch (err) {
       console.error(err)
       toast.error('Error obteniendo disponibilidad')
       setSlots([])
+      setModoManual(true)
     }
     setLoadingSlots(false)
   }
@@ -112,13 +166,11 @@ export default function TurnosPage() {
       if (!nuevoPacienteForm.nombre || (!nuevoPacienteForm.dni && !nuevoPacienteForm.telefono)) {
         throw new Error('El nombre y al menos el DNI o Teléfono son requeridos')
       }
-      
       const { data, error } = await supabase.from('pacientes').insert([nuevoPacienteForm]).select().single()
       if (error) {
         if (error.code === '23505') throw new Error('Ya existe un paciente con ese DNI o Email')
         throw error
       }
-      
       toast.success('Paciente creado correctamente')
       setPacienteSeleccionado(data)
       setShowNuevoPaciente(false)
@@ -131,16 +183,26 @@ export default function TurnosPage() {
 
   function goToStep3() {
     if (!profSeleccionado) { toast.error('Seleccioná un profesional'); return }
+    setSlotSeleccionado(null)
+    setEstadoHoraManual(null)
     fetchSlots()
     setStep(2)
   }
 
+  function toggleModoManual() {
+    const next = !modoManual
+    setModoManual(next)
+    setSlotSeleccionado(null)
+    setEstadoHoraManual(null)
+    setForzarSobreturno(false)
+    setMotivoSobreturno('')
+    if (!next) setHoraManual('')
+  }
+
   function selectSlot(slot) {
     setSlotSeleccionado(slot)
-    if (!slot.disponible) {
-      setForzarSobreturno(false)
-      setMotivoSobreturno('')
-    }
+    setForzarSobreturno(false)
+    setMotivoSobreturno('')
   }
 
   async function confirmarTurno() {
@@ -182,6 +244,11 @@ export default function TurnosPage() {
     }
     setSaving(false)
   }
+
+  // Determina si podemos avanzar al paso 4 desde el paso 3
+  const puedeConfirmar = slotSeleccionado && (
+    slotSeleccionado.disponible || forzarSobreturno
+  )
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
@@ -252,9 +319,9 @@ export default function TurnosPage() {
 
           {!pacienteSeleccionado && !showNuevoPaciente && !buscando && searchPaciente.length >= 2 && (
             <div className="mt-4 pt-4 border-t border-gray-100 animate-fade-in">
-              <p className="text-sm text-gray-500 mb-2">¿No encuentras al paciente o es nuevo?</p>
-              <button 
-                onClick={() => setShowNuevoPaciente(true)} 
+              <p className="text-sm text-gray-500 mb-2">¿No encontrás al paciente o es nuevo?</p>
+              <button
+                onClick={() => setShowNuevoPaciente(true)}
                 className="btn-secondary w-full text-sm py-2 flex items-center justify-center gap-2"
               >
                 <Plus className="w-4 h-4" /> Registrar Nuevo Paciente
@@ -353,70 +420,164 @@ export default function TurnosPage() {
       {/* Step 3: Horario */}
       {step === 2 && (
         <div className="glass-card p-6 space-y-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2"><Clock className="w-5 h-5 text-[#1B4F72]" /> Elegir Horario</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold flex items-center gap-2"><Clock className="w-5 h-5 text-[#1B4F72]" /> Elegir Horario</h2>
+            {/* Toggle manual/automático */}
+            <button
+              onClick={toggleModoManual}
+              className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg border transition-all font-medium ${
+                modoManual
+                  ? 'bg-[#1B4F72] text-white border-[#1B4F72]'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-[#1B4F72] hover:text-[#1B4F72]'
+              }`}
+              title="Alternar entre selección de slots automáticos e ingreso manual de hora"
+            >
+              <Edit3 className="w-4 h-4" />
+              {modoManual ? 'Modo Manual ✓' : 'Ingresar manualmente'}
+            </button>
+          </div>
           <p className="text-sm text-gray-500">
             {profSeleccionado?.apellido}, {profSeleccionado?.nombre} — {fechaTurno}
           </p>
 
           {loadingSlots ? (
             <div className="flex items-center justify-center py-12 text-gray-400"><div className="spinner mr-2"></div> Consultando disponibilidad...</div>
-          ) : slots.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <Clock className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No hay horarios configurados para este día</p>
-              <p className="text-sm">Verificá la configuración de agenda del profesional</p>
-            </div>
           ) : (
             <>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                {slots.map(slot => {
-                  const horaStr = slot.hora_slot?.slice(0, 5)
-                  const selected = slotSeleccionado?.hora_slot === slot.hora_slot
-                  return (
-                    <button
-                      key={slot.hora_slot}
-                      onClick={() => selectSlot(slot)}
-                      className={`p-3 rounded-lg text-sm font-medium transition-all border ${
-                        selected
-                          ? 'bg-[#1B4F72] text-white border-[#1B4F72] shadow-lg'
-                          : slot.disponible
-                            ? 'bg-white hover:bg-blue-50 border-gray-200 hover:border-[#1B4F72] text-gray-700'
-                            : 'bg-red-50 border-red-200 text-red-400 hover:bg-red-100'
-                      }`}
-                    >
-                      {horaStr}
-                      {!slot.disponible && <span className="block text-[0.65rem]">Ocupado</span>}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Checkbox sobreturno */}
-              {slotSeleccionado && !slotSeleccionado.disponible && (
-                <div className="p-4 bg-orange-50 border border-orange-300 rounded-lg animate-fade-in">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={forzarSobreturno}
-                      onChange={e => setForzarSobreturno(e.target.checked)}
-                      className="w-5 h-5 rounded accent-orange-500"
-                    />
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-5 h-5 text-orange-600" />
-                      <span className="font-semibold text-orange-800">Forzar sobreturno</span>
+              {/* ── MODO AUTOMÁTICO (slots) ── */}
+              {!modoManual && (
+                <>
+                  {slots.length === 0 ? (
+                    <div className="text-center py-10 bg-amber-50 border border-amber-200 rounded-lg animate-fade-in">
+                      <Clock className="w-10 h-10 mx-auto mb-3 text-amber-400" />
+                      <p className="font-medium text-amber-800">No hay horarios configurados para este día</p>
+                      <p className="text-sm text-amber-600 mt-1">Se activó el ingreso manual de hora</p>
                     </div>
-                  </label>
-                  {forzarSobreturno && (
-                    <div className="mt-3 form-group animate-fade-in">
-                      <label className="form-label text-orange-700">Motivo del sobreturno (obligatorio)</label>
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                      {slots.map(slot => {
+                        const horaStr = slot.hora_slot?.slice(0, 5)
+                        const selected = slotSeleccionado?.hora_slot === slot.hora_slot
+                        return (
+                          <button
+                            key={slot.hora_slot}
+                            onClick={() => selectSlot(slot)}
+                            className={`p-3 rounded-lg text-sm font-medium transition-all border ${
+                              selected
+                                ? 'bg-[#1B4F72] text-white border-[#1B4F72] shadow-lg'
+                                : slot.disponible
+                                  ? 'bg-white hover:bg-blue-50 border-gray-200 hover:border-[#1B4F72] text-gray-700'
+                                  : 'bg-red-50 border-red-200 text-red-400 hover:bg-red-100'
+                            }`}
+                          >
+                            {horaStr}
+                            {!slot.disponible && <span className="block text-[0.65rem]">Ocupado</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* Sobreturno en modo automático */}
+                  {slotSeleccionado && !slotSeleccionado.disponible && (
+                    <div className="p-4 bg-orange-50 border border-orange-300 rounded-lg animate-fade-in">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={forzarSobreturno}
+                          onChange={e => setForzarSobreturno(e.target.checked)}
+                          className="w-5 h-5 rounded accent-orange-500"
+                        />
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-5 h-5 text-orange-600" />
+                          <span className="font-semibold text-orange-800">Forzar sobreturno</span>
+                        </div>
+                      </label>
+                      {forzarSobreturno && (
+                        <div className="mt-3 form-group animate-fade-in">
+                          <label className="form-label text-orange-700">Motivo del sobreturno (obligatorio)</label>
+                          <input
+                            type="text"
+                            className="form-input border-orange-300"
+                            placeholder="Urgencia, paciente especial, etc."
+                            value={motivoSobreturno}
+                            onChange={e => setMotivoSobreturno(e.target.value)}
+                            required
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── MODO MANUAL ── */}
+              {modoManual && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-700 font-medium mb-3 flex items-center gap-2">
+                      <Edit3 className="w-4 h-4" /> Ingresá el horario deseado
+                    </p>
+                    <div className="flex items-center gap-3">
                       <input
-                        type="text"
-                        className="form-input border-orange-300"
-                        placeholder="Urgencia, paciente especial, etc."
-                        value={motivoSobreturno}
-                        onChange={e => setMotivoSobreturno(e.target.value)}
-                        required
+                        type="time"
+                        className="form-input text-lg font-semibold w-40"
+                        value={horaManual}
+                        onChange={e => setHoraManual(e.target.value)}
+                        step="300"
                       />
+                      {validandoHora && (
+                        <span className="flex items-center gap-1.5 text-sm text-gray-400">
+                          <Loader2 className="w-4 h-4 animate-spin" /> Verificando...
+                        </span>
+                      )}
+                      {!validandoHora && estadoHoraManual === 'libre' && (
+                        <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
+                          <Check className="w-4 h-4" /> Horario disponible
+                        </span>
+                      )}
+                      {!validandoHora && estadoHoraManual === 'ocupado' && (
+                        <span className="flex items-center gap-1.5 text-sm text-orange-600 font-medium">
+                          <AlertTriangle className="w-4 h-4" /> Horario ocupado
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-blue-500 mt-2">
+                      El horario se verificará automáticamente contra los turnos existentes del profesional.
+                    </p>
+                  </div>
+
+                  {/* Sobreturno en modo manual si el horario está ocupado */}
+                  {estadoHoraManual === 'ocupado' && (
+                    <div className="p-4 bg-orange-50 border border-orange-300 rounded-lg animate-fade-in">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={forzarSobreturno}
+                          onChange={e => {
+                            setForzarSobreturno(e.target.checked)
+                            if (!e.target.checked) setMotivoSobreturno('')
+                          }}
+                          className="w-5 h-5 rounded accent-orange-500"
+                        />
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-5 h-5 text-orange-600" />
+                          <span className="font-semibold text-orange-800">Forzar sobreturno en este horario</span>
+                        </div>
+                      </label>
+                      {forzarSobreturno && (
+                        <div className="mt-3 form-group animate-fade-in">
+                          <label className="form-label text-orange-700">Motivo del sobreturno (obligatorio)</label>
+                          <input
+                            type="text"
+                            className="form-input border-orange-300"
+                            placeholder="Urgencia, derivación, paciente especial..."
+                            value={motivoSobreturno}
+                            onChange={e => setMotivoSobreturno(e.target.value)}
+                            required
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -428,7 +589,7 @@ export default function TurnosPage() {
             <button onClick={() => setStep(1)} className="btn-secondary"><ChevronLeft className="w-4 h-4" /> Anterior</button>
             <button
               onClick={() => setStep(3)}
-              disabled={!slotSeleccionado || (!slotSeleccionado.disponible && !forzarSobreturno)}
+              disabled={!puedeConfirmar}
               className="btn-primary"
             >
               Siguiente <ChevronRight className="w-4 h-4" />
@@ -449,7 +610,15 @@ export default function TurnosPage() {
               <div><span className="text-gray-500">Profesional</span><p className="font-medium">Dr. {profSeleccionado?.apellido}, {profSeleccionado?.nombre}</p></div>
               <div><span className="text-gray-500">Especialidad</span><p>{profSeleccionado?.especialidad || 'General'}</p></div>
               <div><span className="text-gray-500">Fecha</span><p className="font-medium">{fechaTurno}</p></div>
-              <div><span className="text-gray-500">Hora</span><p className="font-medium text-lg">{slotSeleccionado?.hora_slot?.slice(0, 5)}</p></div>
+              <div>
+                <span className="text-gray-500">Hora</span>
+                <p className="font-medium text-lg flex items-center gap-2">
+                  {slotSeleccionado?.hora_slot?.slice(0, 5)}
+                  {slotSeleccionado?.manual && (
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-normal">Manual</span>
+                  )}
+                </p>
+              </div>
               <div><span className="text-gray-500">Servicio</span><p>{servicio || 'Consulta general'}</p></div>
               <div><span className="text-gray-500">Precio</span><p>${precio || '0'}</p></div>
             </div>
